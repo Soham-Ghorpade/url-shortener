@@ -1,19 +1,27 @@
 import express from "express";
 import {db} from "../db/index.js";
+import { eq } from "drizzle-orm";
 import { usersTable } from "../models/user.model.js";
-import {randomBytes , createHmac} from "crypto";
+import {randomBytes , createHmac, sign} from "crypto";
+import {signupPostRequestBodySchema} from '../validation/request.validation.js' 
 
 const router = express.Router();
 
 router.post("/signup" , async (req, res) => {
-    const {firstname , lastname , email , password } = req.body;
+    const validationResult =await signupPostRequestBodySchema.safeParseAsync(req.body);
 
-   const existingUser = await db
-   .select({id: usersTable.id})
-   .from(usersTable)
-   .where(eq(usersTable.email,email))
+    if (validationResult.error) {
+        return res.status(400).json({error: validationResult.error.format()});
+    }
 
-    if(existingUser) 
+    const {firstname, lastname , email , password} = validationResult.data;
+
+    const existingUser = await db
+    .select({id: usersTable.id})
+    .from(usersTable)
+    .where(eq(usersTable.email,email))
+
+    if(existingUser.length >0) 
         return res.
         status(400).
         json({error:`user with email ${email} is already exist`})
@@ -32,7 +40,7 @@ router.post("/signup" , async (req, res) => {
         password: hassedPassword,
     }).returning({id: usersTable.id})
 
-    return res.status(201).json({data: {userId: user.id}})
+    return res.status(201).json({data: {userId: user[0].id}})
 
 })
 
