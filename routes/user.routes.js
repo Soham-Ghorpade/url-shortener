@@ -4,8 +4,7 @@ import { usersTable } from "../models/user.model.js";
 import {signupPostRequestBodySchema , loginPostRequestBodySchema} from '../validation/request.validation.js' 
 import { hashPasswordWithSalt } from "../utils/hash.js";
 import { getUserByEmail } from "../services/user.service.js";
-import { createUser } from "../services/create.user.js";
-import jwt from 'jsonwebtoken';
+import { createUserToken } from "../utils/token.js";
 
 
 const router = express.Router();
@@ -22,7 +21,7 @@ router.post("/signup" , async (req, res) => {
 
     const existingUser = await getUserByEmail(email);
 
-    if(existingUser.length >0) 
+    if(existingUser) 
         return res.
         status(400).
         json({error:`user with email ${email} is already exist`})
@@ -30,15 +29,20 @@ router.post("/signup" , async (req, res) => {
 
     const {salt , password:hassedPassword } = hashPasswordWithSalt(password);
 
-    const user = await createUser(
-        firstname,
-        lastname,
-        email,
-        salt,
-        hassedPassword,
-    );
+    const [user] = await db
+    .insert(usersTable)
+    .values({
+      email,
+      firstname,
+      lastname,
+      salt,
+      password: hassedPassword,
+    })
+    .returning({ id: usersTable.id });
 
-    return res.status(201).json({data: {userId: user[0].id}})
+    return res.status(201).json({
+    data: { userId: user.id },
+});
 
 })
 
@@ -78,11 +82,7 @@ router.post("/login", async (req, res) => {
         });
     }
 
-    const token = jwt.sign(
-        { id: user.id },
-        process.env.JWT_SECRET,
-        { expiresIn: "1h" }
-    );
+    const token = await createUserToken({id :user.id})
 
     return res.status(200).json({ token });
 });
