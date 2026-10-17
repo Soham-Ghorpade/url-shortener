@@ -1,5 +1,5 @@
 
-import { validateUserToken } from "../utils/token";
+import { validateUserToken } from "../utils/token.js";
 
 /**
  * 
