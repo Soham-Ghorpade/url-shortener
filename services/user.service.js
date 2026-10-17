@@ -16,3 +16,4 @@ export async function getUserByEmail(email){
 
     return existingUser;
 }
+

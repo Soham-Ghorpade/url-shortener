@@ -4,17 +4,17 @@ import db from "../db/index.js";
 import { usersTable } from "../models/user.model.js";
 import { urlsTable } from "../models/url.model.js";
 import {nanoid} from "nanoid";
+import { ensureAuthenticated } from "../middlewares/auth.middleware.js";
+import {eq} from 'drizzle-orm'
+
 
 
 const router = express.Router();
 
-router.post("/shorten",async function(req, res){
-    const userID = req.user?.id
 
-    if (!userID) {
-        return res.status(401).json({error: "You must be logged in to access this resource"})
-    }
 
+router.post("/shorten",ensureAuthenticated,async function(req, res){
+    
     const validationResult = await shortenPostRequestBodySchema.safeParseAsync(req.body)
 
     if (validationResult.error) {
@@ -39,6 +39,27 @@ router.post("/shorten",async function(req, res){
         shortCode : result.shortCode ,
         targetURL: result.targetURL,
     })    
+})
+
+router.get("/codes",ensureAuthenticated, async function(req,res){
+    const codes = await db
+        .select()
+        .from(urlsTable)
+        .where(eq(urlsTable.userId, req.user.id))
+    return res.json({ codes });
+})
+
+router.get('/:shortCode', async function(req,res){
+    const code = req.params.shortCode
+    const [result] = await db.select({
+        targetURL: urlsTable.targetURL,
+    }).from(urlsTable).where(eq(urlsTable.shortCode, code))
+
+    if (!result){
+        return res.status(404).json({error:"Invalid URL"})
+    }
+
+    return res.redirect(result.targetURL)
 })
 
 export default router;
