@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>URL Shortener</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="container">
+    <header class="app-header">
+      <h1>URL Shortener</h1>
+      <div id="auth-status" class="auth-status hidden">
+        <span id="user-display"></span>
+        <button id="logout-btn" type="button" class="btn-secondary">Log out</button>
+      </div>
+    </header>
+
+    <!-- Global notification / error message banner -->
+    <div id="notice" class="notice hidden" role="alert"></div>
+
+    <!-- Auth Section (Shown when logged out) -->
+    <section id="auth-section" class="card">
+      <div class="tabs">
+        <button id="tab-login" type="button" class="tab-btn active">Log In</button>
+        <button id="tab-signup" type="button" class="tab-btn">Sign Up</button>
+      </div>
+
+      <!-- Login Form -->
+      <form id="login-form">
+        <div class="field">
+          <label for="login-email">Email</label>
+          <input type="email" id="login-email" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="login-password">Password</label>
+          <input type="password" id="login-password" required autocomplete="current-password">
+        </div>
+        <button type="submit" id="login-submit-btn" class="btn-primary">Log In</button>
+      </form>
+
+      <!-- Sign Up Form -->
+      <form id="signup-form" class="hidden">
+        <div class="field">
+          <label for="signup-firstname">First Name</label>
+          <input type="text" id="signup-firstname" required autocomplete="given-name">
+        </div>
+        <div class="field">
+          <label for="signup-lastname">Last Name</label>
+          <input type="text" id="signup-lastname" autocomplete="family-name">
+        </div>
+        <div class="field">
+          <label for="signup-email">Email</label>
+          <input type="email" id="signup-email" required autocomplete="email">
+        </div>
+        <div class="field">
+          <label for="signup-password">Password</label>
+          <input type="password" id="signup-password" required autocomplete="new-password">
+        </div>
+        <button type="submit" id="signup-submit-btn" class="btn-primary">Sign Up</button>
+      </form>
+    </section>
+
+    <!-- Main App Section (Shown when logged in) -->
+    <main id="app-section" class="hidden">
+      <!-- Create Short URL Form -->
+      <section class="card">
+        <h2>Shorten a URL</h2>
+        <form id="shorten-form">
+          <div class="field">
+            <label for="target-url">Target URL</label>
+            <input type="url" id="target-url" placeholder="https://example.com/very/long/url" required>
+          </div>
+          <div class="field">
+            <label for="custom-code">Custom Code (optional)</label>
+            <input type="text" id="custom-code" placeholder="my-custom-code">
+          </div>
+          <button type="submit" id="shorten-submit-btn" class="btn-primary">Create Short URL</button>
+        </form>
+      </section>
+
+      <!-- URL Listing Table -->
+      <section class="card">
+        <h2>My Links</h2>
+        <div class="table-container">
+          <table class="links-table">
+            <thead>
+              <tr>
+                <th scope="col">Short URL</th>
+                <th scope="col">Original URL</th>
+                <th scope="col">Actions</th>
+              </tr>
+            </thead>
+            <tbody id="links-tbody">
+              <!-- Dynamically populated via DOM APIs -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>
