@@ -1,0 +1,11 @@
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      PORT: 8000
+      DATABASE_URL: ${DATABASE_URL:?set DATABASE_URL in .env}
+      JWT_SECRET: ${JWT_SECRET:?set JWT_SECRET in .env}
+    command: sh -c "pnpm db:push && pnpm start"
