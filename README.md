@@ -2,7 +2,7 @@
 
 A URL shortener with user accounts. Users sign up, log in, turn long URLs into short codes (random or custom), see their own links, and delete them. Anyone who opens a short link is redirected to the original URL.
 
-Built for the Cloud Computing mini project. Area: **Cloud Database** (PostgreSQL), with the whole system containerized using **Docker Compose**.
+Built for the Cloud Computing mini project. Area: **Cloud Database**. The data lives in a managed PostgreSQL database on **Neon** (AWS, Singapore region), and the application is containerized with **Docker**. A fully local setup with Docker Compose is included as a fallback.
 
 ## Features
 
@@ -20,7 +20,8 @@ Built for the Cloud Computing mini project. Area: **Cloud Database** (PostgreSQL
 | Part | Technology |
 | --- | --- |
 | Backend | Node.js 22, Express 4 |
-| Database | PostgreSQL 17 |
+| Database (main) | Managed PostgreSQL on Neon (free plan, AWS Singapore) |
+| Database (local fallback) | PostgreSQL 17 in a Docker container |
 | ORM | Drizzle ORM (`drizzle-kit push` creates the tables) |
 | Validation | Zod |
 | Auth | JWT (`jsonwebtoken`) |
@@ -28,18 +29,35 @@ Built for the Cloud Computing mini project. Area: **Cloud Database** (PostgreSQL
 | Frontend | Plain HTML, CSS and JavaScript (`public/`) |
 | Containers | Docker, Docker Compose |
 
-## How it runs
+## Architecture
 
-`docker compose up` starts two containers on a private network:
+The project has two tiers that run in different places:
 
-- `db`: PostgreSQL. Its data is stored in the named volume `pg_data`, so it survives restarts. A healthcheck (`pg_isready`) tells Compose when it is ready.
-- `app`: the Node/Express server. It waits for `db` to be healthy, runs `pnpm db:push` to create the tables, then starts on port 8000.
+```
+Browser  ->  App (Express, in Docker or on the laptop)  ->  Neon PostgreSQL (cloud, over SSL)
+```
 
-Inside the Docker network the app reaches the database at `db:5432`. From your own machine, Postgres is exposed on `localhost:5433`.
+- **App tier:** the Express server, packaged as a Docker image, running on the local machine.
+- **Database tier:** a managed PostgreSQL database hosted by Neon. The app finds it only through the `DATABASE_URL` environment variable, so switching to a different database means changing one setting, not the code.
+- **Configuration:** the database URL and the JWT secret are read from environment variables. Secrets are never stored in the code or the repository.
 
-## Run with Docker (recommended)
+## Two ways to run it
 
-You need Docker with the Compose plugin.
+| | Cloud database (main) | Everything local (fallback) |
+| --- | --- | --- |
+| Database | Neon (cloud) | Postgres container with the `pg_data` volume |
+| Compose file | `docker-compose.neon.yml` | `docker-compose.yml` |
+| Needs internet | Yes | No |
+| Needs in `.env` | `DATABASE_URL`, `JWT_SECRET` | `POSTGRES_PASSWORD`, `JWT_SECRET` |
+
+Run only one at a time, because both use port 8000. The two databases are separate, so users created in one do not exist in the other.
+
+## Run with the Neon cloud database (main)
+
+You need Docker with the Compose plugin and a free Neon account.
+
+1. Create a free project at neon.com. In the project, click **Connect**, turn **Connection pooling** off, and copy the connection string (it starts with `postgresql://`). If it ends with `&channel_binding=require`, remove that part.
+2. Clone the repo and create your `.env`:
 
 ```bash
 git clone https://github.com/Soham-Ghorpade/url-shortener.git
@@ -47,13 +65,55 @@ cd url-shortener
 cp .env.example .env
 ```
 
-Open `.env` and set your own `JWT_SECRET` and `POSTGRES_PASSWORD`. Then:
+3. Open `.env` and set `DATABASE_URL` to your Neon connection string and `JWT_SECRET` to any long random string. Never commit this file.
+4. Start the app:
+
+```bash
+docker compose -f docker-compose.neon.yml up -d --build
+```
+
+5. Open http://localhost:8000. On start, the app runs `pnpm db:push` to create the tables in Neon.
+
+Stop it with:
+
+```bash
+docker compose -f docker-compose.neon.yml down
+```
+
+Your data stays in Neon, so stopping the container loses nothing.
+
+You can also run the app without Docker:
+
+```bash
+pnpm install
+pnpm db:push        # create the tables in Neon
+pnpm dev
+```
+
+Notes for the free plan: the database goes to sleep when idle, so the first request after a break can take a few seconds. If Node prints an SSL mode warning, you can change `sslmode=require` to `sslmode=verify-full` at the end of the connection string.
+
+## Run everything locally with Docker (fallback)
+
+This starts the app and a Postgres container together, with no internet or Neon account needed.
+
+```bash
+cp .env.example .env
+```
+
+Set `POSTGRES_PASSWORD` and `JWT_SECRET` in `.env`, then:
 
 ```bash
 docker compose up -d --build
 ```
 
 Open http://localhost:8000.
+
+How it works: `docker compose up` starts two containers on a private network.
+
+- `db`: PostgreSQL. Its data is stored in the named volume `pg_data`, so it survives restarts. A healthcheck (`pg_isready`) tells Compose when it is ready.
+- `app`: the Node/Express server. It waits for `db` to be healthy, runs `pnpm db:push` to create the tables, then starts on port 8000.
+
+Inside the Docker network the app reaches the database at `db:5432`. From your own machine, Postgres is exposed on `localhost:5433`. In this mode the compose file builds its own database address, so the `DATABASE_URL` line in `.env` is ignored.
 
 Useful commands:
 
@@ -64,28 +124,24 @@ docker compose down            # stop and remove containers (data is kept)
 docker compose down -v         # also delete the database volume (data is lost)
 ```
 
-## Run locally without Docker for the app
-
-Start only the database in Docker, then run the app with Node:
-
-```bash
-docker compose up -d db
-pnpm install
-pnpm db:push        # create the tables
-pnpm dev
-```
-
-Your `.env` for this mode needs `DATABASE_URL=postgres://postgres:<password>@localhost:5433/postgres`.
-
 ## Environment variables
 
 See `.env.example`. Never commit your real `.env`.
 
 | Variable | Purpose |
 | --- | --- |
-| `DATABASE_URL` | Connection string used when running the app outside Docker |
+| `DATABASE_URL` | Connection string of the database. Use your Neon string for the cloud setup. Also used by `pnpm dev`, `pnpm db:push` and `pnpm db:studio` |
 | `JWT_SECRET` | Secret used to sign and verify login tokens |
-| `POSTGRES_PASSWORD` | Password for the Postgres container (also used to build the app's database URL in Docker) |
+| `POSTGRES_PASSWORD` | Password for the local Postgres container (local fallback only) |
+
+## Cloud computing concepts shown
+
+- **Managed cloud database:** the data is stored in a PostgreSQL service hosted by Neon, not on the application machine.
+- **Separate tiers:** the application and the database are independent and talk over an encrypted network connection.
+- **Configuration through the environment:** the same code works against a local or a cloud database by changing `DATABASE_URL`.
+- **Containers:** the application is packaged as a Docker image, so it runs the same way on any machine.
+- **Persistent storage (local setup):** a named Docker volume keeps the database files when containers are removed.
+- **Health checks and startup order (local setup):** the app waits until the database reports healthy.
 
 ## API
 
@@ -106,14 +162,15 @@ Errors: `400` for invalid input, `401` when you are not logged in, `409` when a 
 ## Project structure
 
 ```
-db/            database connection (Drizzle)
-models/        table definitions (users, urls)
-routes/        user and URL routes
-middlewares/   authentication middleware
-services/      database helper functions
-utils/         password hashing and token helpers
-validation/    Zod schemas for request bodies
-public/        frontend (index.html, styles.css, app.js)
-Dockerfile
-docker-compose.yml
+db/                      database connection (Drizzle)
+models/                  table definitions (users, urls)
+routes/                  user and URL routes
+middlewares/             authentication middleware
+services/                database helper functions
+utils/                   password hashing and token helpers
+validation/              Zod schemas for request bodies
+public/                  frontend (index.html, styles.css, app.js)
+Dockerfile               image for the app
+docker-compose.neon.yml  app only, uses the Neon cloud database
+docker-compose.yml       app + local Postgres (fallback)
 ```
