@@ -29,14 +29,24 @@ router.post("/shorten",ensureAuthenticated,async function(req, res){
 
     const shortCode = code ?? nanoid(6)
 
-    const [result] = await db.insert(urlsTable).values({
-        shortCode , 
-        targetURL : url,
-        userId : req.user.id,  
-    }).returning({
-        id: urlsTable.id , 
-        shortCode: urlsTable.shortCode ,
-        targetURL: urlsTable.targetURL})
+    let result;
+    try {
+        const [inserted] = await db.insert(urlsTable).values({
+            shortCode , 
+            targetURL : url,
+            userId : req.user.id,  
+        }).returning({
+            id: urlsTable.id , 
+            shortCode: urlsTable.shortCode ,
+            targetURL: urlsTable.targetURL
+        });
+        result = inserted;
+    } catch (err) {
+        if (err?.code === '23505' || err?.cause?.code === '23505') {
+            return res.status(409).json({ error: "that short code is already taken" });
+        }
+        return res.status(500).json({ error: "Internal server error" });
+    }
 
     return res.status(201).json({
         id: result.id ,
