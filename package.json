@@ -5,10 +5,11 @@
   "main": "index.js",
   "type": "module",
   "scripts": {
-    "dev": "node --watch index",
-    "db:push": "drizzle-kit push",
-    "db:studio": "drizzle-kit studio"
-  },
+  "dev": "node --watch index",
+  "start": "node index.js",
+  "db:push": "drizzle-kit push",
+  "db:studio": "drizzle-kit studio"
+},
   "keywords": [],
   "author": "",
   "license": "ISC",
